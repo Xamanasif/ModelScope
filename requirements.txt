@@ -1,0 +1,17 @@
+# Direct runtime + test dependencies, pinned to the versions tested on
+# Windows 11 / Python 3.11.9 (2026-11-18). Every pin declares
+# requires_python >= 3.11 or lower on PyPI, so 3.12 should resolve, but 3.12
+# was NOT tested. Full transitive lock of the tested environment: requirements-lock.txt
+fastapi==0.163.2
+uvicorn==0.54.0
+numpy==2.4.6
+pandas==3.1.1
+scikit-learn==1.9.1
+scipy==1.17.1
+shap==0.51.0
+joblib==1.6.0
+# tests
+httpx==0.28.1
+pytest==9.2.0
+# optional: real-browser UI tests (uses installed Microsoft Edge; no browser download)
+playwright==1.65.2

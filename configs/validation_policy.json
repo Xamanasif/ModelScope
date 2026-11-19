@@ -1,0 +1,129 @@
+{
+  "policy_version": "1.0.0",
+  "status": "pre_registered_before_modelling",
+  "registered_utc": "2026-11-18",
+  "scope_note": "Local research prototype policy. Not a bank, regulatory or production approval policy.",
+  "dataset": {
+    "uci_id": 350,
+    "expected_sha256": "45bcf4df62ff2e237a74eb155cabfb4bbbc171219a0637daef44fdad07503dd0",
+    "on_hash_mismatch": "refuse: a different file is a different study and needs a new policy version"
+  },
+  "target": {
+    "column": "DEFAULT_NEXT_MONTH",
+    "source_column": "Y",
+    "positive_label": 1,
+    "source_confirmation": "UCI variable_info: 'default payment (Yes = 1, No = 0)'"
+  },
+  "id_column": "ID",
+  "split": {
+    "unit": "unique customer ID",
+    "stratify_on": "target",
+    "seed": 42,
+    "fractions": {"train": 0.60, "tuning": 0.15, "calibration": 0.10, "final": 0.15},
+    "expected_counts": {"train": 18000, "tuning": 4500, "calibration": 3000, "final": 4500},
+    "expected_manifest_sha256": "a35d7f50d563f9e195542264fc9546f7b010af0c3430efae58f28b165933e37e",
+    "temporal_note": "Cross-sectional sample; row order is not chronological. No out-of-time claim is possible."
+  },
+  "features": {
+    "demographic_predictors": false,
+    "demographic_columns": ["SEX", "EDUCATION", "MARRIAGE", "AGE"],
+    "demographic_policy_note": "Default excludes demographics from predictors; they are used only for audit slices. Setting true changes the study identity.",
+    "excluded_always": ["ID", "DEFAULT_NEXT_MONTH"],
+    "undocumented_code_treatment": "PAY_* codes -2 and 0 kept as distinct codes; EDUCATION {0,5,6} and MARRIAGE {0} grouped as 'undocumented_code' only where demographics are used",
+    "preprocessing_fit_partition": "train"
+  },
+  "models": {
+    "class_weighting": "none (resampling/weighting distorts predicted probabilities; not used)",
+    "baseline": {
+      "family": "logistic_regression",
+      "untuned": {"C": 1.0},
+      "search_space": {"C": [0.001, 0.01, 0.1, 1.0, 10.0]},
+      "search": "grid"
+    },
+    "challenger": {
+      "family": "hist_gradient_boosting",
+      "untuned": {"learning_rate": 0.1, "max_iter": 100, "max_leaf_nodes": 31, "min_samples_leaf": 20, "l2_regularization": 0.0},
+      "search_space": {
+        "learning_rate": [0.03, 0.05, 0.1],
+        "max_iter": [100, 200, 400],
+        "max_leaf_nodes": [15, 31],
+        "min_samples_leaf": [20, 50, 100],
+        "l2_regularization": [0.0, 1.0]
+      },
+      "search": "random",
+      "n_configurations": 12,
+      "search_seed": 7
+    },
+    "hyperparameter_selection": "lowest mean log loss in 5-fold stratified CV inside the train partition only",
+    "cv_folds": 5,
+    "model_seed": 42
+  },
+  "calibration": {
+    "candidate_methods": ["none", "sigmoid"],
+    "pre_specified_default": "sigmoid",
+    "fit_partition": "calibration",
+    "selection_rule": "For each model, use sigmoid unless it increases log loss on the tuning partition relative to the uncalibrated model; then use none.",
+    "isotonic": "not used in v1: only 3000 calibration rows and no separate partition to select it without bias"
+  },
+  "champion_selection": {
+    "evidence_partition": "tuning",
+    "metric": "log_loss of calibrated probabilities",
+    "rule": "Select the challenger only if the upper bound of the paired 95% bootstrap CI for (challenger log loss - baseline log loss) on the tuning partition is below 0; otherwise retain the interpretable baseline.",
+    "secondary_reported": ["roc_auc", "average_precision", "brier"]
+  },
+  "threshold": {
+    "primary": 0.5,
+    "rationale": "On calibrated probabilities 0.5 means 'default judged more likely than not'. Illustrative for reporting only; not an operational lending cut-off. A cost-based threshold c_fp/(c_fp+c_fn) is available as a user-supplied scenario.",
+    "reported_grid": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+  },
+  "uncertainty": {
+    "method": "paired nonparametric percentile bootstrap over customers (same resampled rows for both models)",
+    "n_resamples": 1000,
+    "confidence": 0.95,
+    "seed": 2026,
+    "conditional_on": "fitted models and the evaluation sample; excludes training-sample uncertainty",
+    "repeated_development_cv": {"folds": 5, "repeats": 2, "data": "train+tuning", "seed": 11}
+  },
+  "slices": {
+    "evaluation_partitions": ["tuning", "final"],
+    "minimum_support": 100,
+    "minimum_events": 20,
+    "support_note": "Review warnings, not universal statistical cut-offs.",
+    "credit_limit_bands": "quartiles of LIMIT_BAL fitted on the train partition",
+    "repayment_groups": "PAY_0 grouped: <=0 (no delay code), 1, >=2; and count of delayed months (PAY_* >= 1) in six months: 0, 1-2, 3+",
+    "demographic_groups": ["SEX", "EDUCATION", "MARRIAGE", "AGE_BAND"],
+    "age_bands": [[18, 29], [30, 39], [40, 49], [50, 100]],
+    "bootstrap_resamples": 200,
+    "language": "Descriptive audit only; no legal fairness determination; no multiplicity correction."
+  },
+  "stress": {
+    "partition": "tuning",
+    "seed": 99,
+    "scenarios": "see app/stress.py SCENARIOS; seeded, documented perturbations"
+  },
+  "drift": {
+    "reference_partition": "train",
+    "psi_bins": 10,
+    "psi_watch": 0.1,
+    "psi_review_trigger": 0.25,
+    "note": "Configurable review triggers, not regulatory limits."
+  },
+  "explanations": {
+    "explain_partition": "tuning",
+    "n_explain": 500,
+    "background_partition": "train",
+    "n_background": 200,
+    "seed": 5,
+    "additivity_tolerance": 1e-6,
+    "stability_refits": 5
+  },
+  "review_checks": {
+    "calibration_in_the_large_abs_max": 0.02,
+    "ece_max": 0.03,
+    "stress_auc_drop_max": 0.05,
+    "final_vs_development_auc_drop_max": 0.03,
+    "slice_auc_gap_note": "Slices whose AUC CI lies wholly below overall AUC are flagged for review."
+  },
+  "final_holdout_rule": "Evaluate once, only after the selection record is frozen, with explicit confirmation. Results are an audit; they are never used to change models, thresholds, calibration or criteria.",
+  "release_approval": "explicit_human_research_review; deterministic checks flag concerns but never accept a model"
+}

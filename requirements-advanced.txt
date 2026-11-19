@@ -1,0 +1,6 @@
+# The starter suggested mlflow, shap and matplotlib here.
+# - shap is now a pinned core dependency (requirements.txt).
+# - mlflow was deliberately NOT adopted (docs/DECISIONS.md D-011): the SQLite
+#   registry + hashed JSON evidence is the single source of truth, and a second
+#   tracking store would create conflicting records.
+# - matplotlib is unnecessary: the dashboard draws its own SVG charts.

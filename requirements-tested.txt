@@ -1,0 +1,4 @@
+# Superseded by requirements.txt (direct pins) and requirements-lock.txt (full
+# `pip freeze` of the tested environment: Windows 11, Python 3.11.9, 2026-11-18).
+# The starter's Linux/Python 3.12 pins are kept in git history only.
+-r requirements.txt
